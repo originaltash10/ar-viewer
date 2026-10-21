@@ -16,7 +16,7 @@
   body { position: relative; }
   a-scene { position: fixed; inset: 0; background: transparent; }
   a-scene canvas { background: transparent !important; }
-  body > video { position: fixed !important; inset: 0; width: 100vw !important; height: 100vh !important; object-fit: cover; z-index: -2; }
+  /* Do not restyle the camera <video>: MindAR positions it itself and aligns its rendering to that layout. */
 
   .ui { position: fixed; inset: 0; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
   .top { display: flex; align-items: center; justify-content: space-between; padding: calc(12px + env(safe-area-inset-top)) 14px 0; }
@@ -46,12 +46,13 @@
 <body>
 
 <a-scene id="scene"
-  mindar-image="imageTargetSrc: targets.mind; autoStart: true; uiLoading: no; uiScanning: no; uiError: no; filterMinCF: 0.0001; filterBeta: 0.01;"
+  mindar-image="imageTargetSrc: targets.mind; autoStart: true; uiLoading: no; uiScanning: no; uiError: no; filterMinCF: 0.00005; filterBeta: 0.001; warmupTolerance: 6; missTolerance: 8;"
   color-management="legacy" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false"
-  renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true;">
+  renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true; toneMapping: ACESFilmic; exposure: 1.1;">
   <a-camera position="0 0 0" look-controls="enabled: false" wasd-controls="enabled: false"></a-camera>
-  <a-entity light="type: ambient; intensity: 1.2"></a-entity>
-  <a-entity light="type: directional; intensity: 1.4" position="1 2 2"></a-entity>
+  <a-entity light="type: hemisphere; color: #ffffff; groundColor: #8a8a8a; intensity: 2.2"></a-entity>
+  <a-entity light="type: directional; color: #fff6e8; intensity: 2.6" position="1.5 3 2.5"></a-entity>
+  <a-entity light="type: directional; color: #dce8ff; intensity: 0.9" position="-2 1 -1.5"></a-entity>
 
   <a-entity id="target" mindar-image-target="targetIndex: 0">
     <!-- Faint outline the size of the printed card: confirms the tracking frame even if the model is off-screen. -->
@@ -159,6 +160,14 @@
       clearTimeout(foundTimer); foundTimer = setTimeout(() => { status.hidden = true; }, 1200);
     });
     target.addEventListener('targetLost', () => { status.hidden = false; status.textContent = 'Card lost. Point the camera at it again.'; });
+
+    // MindAR's default far plane is ~10,000 target-pixels (under a metre for this card). Push it out.
+    const extendFar = () => {
+      const cam = scene.camera; if (!cam) return;
+      cam.far = 200000; cam.updateProjectionMatrix();
+    };
+    scene.addEventListener('arReady', () => { extendFar(); setTimeout(extendFar, 500); });
+    window.addEventListener('resize', () => setTimeout(extendFar, 300));
 
     scene.addEventListener('arError', () => {
       document.body.innerHTML = `<div class="error"><h1>Camera not available</h1><p>Open this link in Safari (iPhone) or Chrome (Android), not inside another app, and allow camera access.</p><a href="${back.href}">Back</a></div>`;
