@@ -125,18 +125,19 @@
 
     gltf.addEventListener('model-loaded', () => {
       const obj = gltf.object3D;
-      // Measure in the model's own space, not world space: the card's camera-relative transform
-      // (huge numbers in tracker units) and the rig rotation must not leak into the centring offset.
-      obj.updateMatrixWorld(true);
-      const toLocal = new THREE.Matrix4().copy(obj.matrixWorld).invert();
+      // Measure in the model's own space by walking each mesh's local transforms up to the entity.
+      // (No world-matrix inversion: MindAR keeps the card's matrix at all zeros until it is first seen.)
       const box = new THREE.Box3();
+      const tmp = new THREE.Matrix4();
       obj.traverse((m) => {
-        if (m.isMesh && m.geometry) {
-          if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
-          box.union(m.geometry.boundingBox.clone().applyMatrix4(m.matrixWorld).applyMatrix4(toLocal));
-        }
+        if (!m.isMesh || !m.geometry || !m.geometry.attributes.position) return;
+        if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+        tmp.identity();
+        for (let n = m; n && n !== obj; n = n.parent) { n.updateMatrix(); tmp.premultiply(n.matrix); }
+        const b = m.geometry.boundingBox.clone().applyMatrix4(tmp);
+        if (Number.isFinite(b.min.x) && Number.isFinite(b.max.x)) box.union(b);
       });
-      if (box.isEmpty()) { status.textContent = 'Model loaded but contains no mesh geometry.'; return; }
+      if (box.isEmpty()) { status.textContent = 'Model loaded but its size could not be measured; showing it uncentred.'; applyScale(oneToOne); return; }
       const size = new THREE.Vector3(); box.getSize(size);
       const centre = new THREE.Vector3(); box.getCenter(centre);
       largest = Math.max(size.x, size.y, size.z) || 1;
