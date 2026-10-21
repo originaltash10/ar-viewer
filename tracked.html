@@ -54,6 +54,9 @@
   <a-entity light="type: directional; intensity: 1.4" position="1 2 2"></a-entity>
 
   <a-entity id="target" mindar-image-target="targetIndex: 0">
+    <!-- Faint outline the size of the printed card: confirms the tracking frame even if the model is off-screen. -->
+    <a-plane width="1" height="1" color="#7FA9D6" opacity="0.18" transparent="true" side="double"></a-plane>
+    <a-ring radius-inner="0.03" radius-outer="0.05" color="#7FA9D6" position="0 0 0.001"></a-ring>
     <!-- rotation 90° about X stands the model up out of the card (glTF is Y-up; the card plane is XY with Z toward the viewer). -->
     <a-entity id="rig" rotation="90 0 0">
       <a-entity id="gltf"></a-entity>
@@ -73,7 +76,7 @@
       <div class="readout"><span id="ratio">1 : 1</span><small>pinch to resize</small></div>
       <button type="button" class="primary" id="one">1 : 1</button>
     </div>
-    <div class="hint">Keep the whole printed card in view. Move the card, the model follows.</div>
+    <div class="hint" id="hintline">Keep the whole printed card in view. Move the card, the model follows.</div>
   </div>
 </div>
 
@@ -108,6 +111,7 @@
     // In MindAR the card is 1 unit wide, so 1:1 means (1 / cardWidth) scene units per metre.
     const oneToOne = 1 / cardWidth;
     let largest = 1;        // largest model dimension in metres, set on load
+    let modelInfo = '';
     let scale = oneToOne;   // current rig scale (scene units per metre)
 
     function applyScale(s) {
@@ -138,10 +142,12 @@
       largest = Math.max(size.x, size.y, size.z) || 1;
       // Centre the model on the card and sit its base on the card surface (model space, before the rig rotation).
       obj.position.set(-centre.x, -box.min.y, -centre.z);
-      // Start at real size if it fits on the card, otherwise fit it.
-      if (largest * oneToOne <= 1.2) applyScale(oneToOne); else fitToCard();
-      const cm = (v) => (v * 100).toFixed(0);
-      status.textContent = `Model loaded (${cm(size.x)} × ${cm(size.y)} × ${cm(size.z)} cm). Point the camera at the printed card.`;
+      // Always start at 1:1 with the exported file's units (model-viewer and the card share the same metres).
+      applyScale(oneToOne);
+      const cm = (v) => (v * 100).toFixed(1);
+      modelInfo = `${cm(size.x)} × ${cm(size.y)} × ${cm(size.z)} cm`;
+      status.textContent = `Model loaded (${modelInfo}). Point the camera at the printed card.`;
+      if (largest * oneToOne > 30) status.textContent += ' Note: at 1:1 the model is over 30 cards wide; tap "Fit to card" if you cannot find it.';
     });
     gltf.addEventListener('model-error', (e) => { status.textContent = `Couldn't load ${modelUrl}`; console.error(e.detail); });
 
@@ -173,6 +179,15 @@
       }
     }, { passive: false });
     window.addEventListener('touchend', () => { lastDist = null; });
+
+    if (q.get('debug')) {
+      const h = document.getElementById('hintline');
+      setInterval(() => {
+        const p = gltf.object3D.position;
+        const vis = target.object3D.visible;
+        h.textContent = `model ${modelInfo || '…'} | rig scale ${scale.toFixed(2)} | offset ${p.x.toFixed(2)},${p.y.toFixed(2)},${p.z.toFixed(2)} | card ${vis ? 'tracked' : 'lost'}`;
+      }, 500);
+    }
   }
 </script>
 </body>
