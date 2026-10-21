@@ -40,9 +40,20 @@
   .code button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .print { justify-self: start; appearance: none; font: inherit; font-size: 15px; font-weight: 600; padding: 11px 16px;
     border-radius: 10px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+  .sheet { display: grid; gap: 12px; }
+  .sheet h2 { margin: 0; font-size: 18px; font-weight: 600; }
+  .card-print { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 12px; justify-items: start; }
+  .target { width: 150mm; max-width: 100%; height: auto; display: block; }
+  .card-codes { display: flex; gap: 10mm; flex-wrap: wrap; }
+  .card-codes figure { margin: 0; display: grid; justify-items: center; gap: 2mm; font-size: 10pt; color: #111; }
+  .card-codes canvas, .card-codes img { width: 28mm !important; height: 28mm !important; }
   @media print {
+    .sheet { display: grid; page-break-before: always; }
+    .sheet p, .sheet h2 { display: none; }
+    .card-print { border: none; padding: 0; }
+    .target { max-width: none; }
     body { background: #fff; }
-    main > :not(.codes) { display: none; }
+    main > :not(.codes):not(.sheet) { display: none; }
     .codes { grid-template-columns: 1fr 1fr; }
     .code { border: none; }
     .code button { display: none; }
@@ -53,7 +64,7 @@
 <main>
   <div>
     <h1>Make QR codes for a model</h1>
-    <p>Type the file name you uploaded to the models folder. Two codes appear: one lets people pinch to resize, the other locks the model at real size.</p>
+    <p>Type the file name you uploaded to the models folder. Three codes appear: place in the room with resizing, place at real size, or pin the model to the printed card.</p>
   </div>
 
   <div class="form">
@@ -81,9 +92,25 @@
       <a class="url" id="u-fixed" target="_blank" rel="noopener"></a>
       <button type="button" id="d-fixed">Download PNG</button>
     </div>
+    <div class="code">
+      <div class="qr" id="qr-card"></div>
+      <h2 id="h-card"></h2>
+      <div class="mode">Pinned to printed card</div>
+      <a class="url" id="u-card" target="_blank" rel="noopener"></a>
+      <button type="button" id="d-card">Download PNG</button>
+    </div>
   </div>
 
-  <button type="button" class="print" id="print" hidden>Print both</button>
+  <section class="sheet" id="sheet" hidden>
+    <h2>Printed card</h2>
+    <p>Print this page and the card below comes out exactly 150 mm wide, which the card mode relies on for real-size scale. Keep it flat and well lit. If you print it at another width, add <code>&amp;card=200</code> (the width in mm) to the card link.</p>
+    <div class="card-print">
+      <img src="target.png" alt="Tracking card" class="target">
+      <div class="card-codes" id="card-codes"></div>
+    </div>
+  </section>
+
+  <button type="button" class="print" id="print" hidden>Print codes and card</button>
 </main>
 
 <script>
@@ -103,8 +130,9 @@
     $('print').hidden = !show;
     if (!show) return;
 
-    for (const mode of ['free', 'fixed']) {
-      const params = new URLSearchParams({ model, scale: mode });
+    for (const mode of ['free', 'fixed', 'card']) {
+      const params = new URLSearchParams({ model });
+      if (mode === 'card') params.set('mode', 'card'); else params.set('scale', mode);
       if (title) params.set('title', title);
       const url = base + '?' + params.toString();
       const box = $('qr-' + mode);
@@ -118,6 +146,17 @@
       $('u-' + mode).textContent = url;
       $('u-' + mode).href = url;
       $('d-' + mode).onclick = () => download(box, `${model}-${mode}.png`, title || model, mode);
+    }
+    // Small copies of all three codes for the printed card sheet.
+    $('sheet').hidden = false;
+    const cc = $('card-codes'); cc.innerHTML = '';
+    const labels = { free: 'Place in room', fixed: 'Actual size', card: 'Pin to card' };
+    for (const mode of ['free', 'fixed', 'card']) {
+      const fig = document.createElement('figure');
+      const holder = document.createElement('div');
+      new QRCode(holder, { text: $('u-' + mode).href, width: 160, height: 160, correctLevel: QRCode.CorrectLevel.H });
+      const cap = document.createElement('figcaption'); cap.textContent = `${title || model} · ${labels[mode]}`;
+      fig.append(holder, cap); cc.append(fig);
     }
   }
 
@@ -137,7 +176,7 @@
     ctx.fillText(label, c.width / 2, size + pad * 2 + 40);
     ctx.font = '400 34px -apple-system, Segoe UI, Roboto, sans-serif';
     ctx.fillStyle = '#555';
-    ctx.fillText(mode === 'fixed' ? 'Actual size (1:1)' : 'Pinch to resize', c.width / 2, size + pad * 2 + 95);
+    ctx.fillText({ fixed: 'Actual size (1:1)', card: 'Pinned to printed card', free: 'Pinch to resize' }[mode], c.width / 2, size + pad * 2 + 95);
     const a = document.createElement('a');
     a.href = c.toDataURL('image/png'); a.download = filename; a.click();
   }
