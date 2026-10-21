@@ -9,9 +9,14 @@
 <style>
   :root { --ink: #FFFFFF; --ink-soft: rgba(255,255,255,.72); --panel: rgba(20,20,18,.72); --accent: #7FA9D6; --accent-ink: #0F1A26; }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: #000; color: var(--ink); overflow: hidden;
+  html { background: #000; }
+  /* body must stay transparent: MindAR places the camera video behind the page content (z-index -2) */
+  html, body { margin: 0; height: 100%; color: var(--ink); overflow: hidden;
     font-family: -apple-system, "SF Pro Text", "Segoe UI Variable", "Segoe UI", Roboto, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-  a-scene { position: fixed; inset: 0; }
+  body { position: relative; }
+  a-scene { position: fixed; inset: 0; background: transparent; }
+  a-scene canvas { background: transparent !important; }
+  body > video { position: fixed !important; inset: 0; width: 100vw !important; height: 100vh !important; object-fit: cover; z-index: -2; }
 
   .ui { position: fixed; inset: 0; pointer-events: none; display: flex; flex-direction: column; justify-content: space-between; }
   .top { display: flex; align-items: center; justify-content: space-between; padding: calc(12px + env(safe-area-inset-top)) 14px 0; }
