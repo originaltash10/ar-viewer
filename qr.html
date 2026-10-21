@@ -29,7 +29,7 @@
   input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   small { color: var(--ink-soft); font-weight: 400; }
   .site { font-family: ui-monospace, Menlo, monospace; font-size: 13px; color: var(--ink-soft); word-break: break-all; }
-  .codes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .codes { display: grid; grid-template-columns: minmax(260px, 360px); gap: 16px; }
   .code { background: #fff; color: #111; border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: grid; gap: 10px; justify-items: center; text-align: center; }
   .code .qr { padding: 8px; }
   .code h2 { margin: 0; font-size: 17px; font-weight: 600; }
@@ -40,21 +40,9 @@
   .code button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .print { justify-self: start; appearance: none; font: inherit; font-size: 15px; font-weight: 600; padding: 11px 16px;
     border-radius: 10px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); cursor: pointer; }
-  .sheet { display: grid; gap: 12px; }
-  .sheet h2 { margin: 0; font-size: 18px; font-weight: 600; }
-  .card-print { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 12px; justify-items: start; }
-  .target { width: 3in; height: 3in; display: block; image-rendering: crisp-edges; }
-  .card-codes { display: flex; gap: 10mm; flex-wrap: wrap; }
-  .card-codes figure { margin: 0; display: grid; justify-items: center; gap: 2mm; font-size: 10pt; color: #111; }
-  .card-codes canvas, .card-codes img { width: 28mm !important; height: 28mm !important; }
   @media print {
-    .sheet { display: grid; page-break-before: always; }
-    .sheet p, .sheet h2 { display: none; }
-    .card-print { border: none; padding: 0; }
-    .target { max-width: none; }
     body { background: #fff; }
-    main > :not(.codes):not(.sheet) { display: none; }
-    .codes { grid-template-columns: 1fr 1fr; }
+    main > :not(.codes) { display: none; }
     .code { border: none; }
     .code button { display: none; }
   }
@@ -63,8 +51,8 @@
 <body>
 <main>
   <div>
-    <h1>Make QR codes for a model</h1>
-    <p>Type the file name you uploaded to the models folder. Three codes appear: place in the room with resizing, place at real size, or pin the model to the printed card.</p>
+    <h1>Make a QR code for a model</h1>
+    <p>Type the file name you uploaded to the models folder. A QR code appears that opens the model with a View in AR button.</p>
   </div>
 
   <div class="form">
@@ -79,38 +67,15 @@
 
   <div class="codes" id="codes" hidden>
     <div class="code">
-      <div class="qr" id="qr-free"></div>
-      <h2 id="h-free"></h2>
-      <div class="mode">Pinch to resize</div>
-      <a class="url" id="u-free" target="_blank" rel="noopener"></a>
-      <button type="button" id="d-free">Download PNG</button>
-    </div>
-    <div class="code">
-      <div class="qr" id="qr-fixed"></div>
-      <h2 id="h-fixed"></h2>
-      <div class="mode">Actual size (1:1)</div>
-      <a class="url" id="u-fixed" target="_blank" rel="noopener"></a>
-      <button type="button" id="d-fixed">Download PNG</button>
-    </div>
-    <div class="code">
-      <div class="qr" id="qr-card"></div>
-      <h2 id="h-card"></h2>
-      <div class="mode">Pinned to printed card</div>
-      <a class="url" id="u-card" target="_blank" rel="noopener"></a>
-      <button type="button" id="d-card">Download PNG</button>
+      <div class="qr" id="qr-ar"></div>
+      <h2 id="h-ar"></h2>
+      <div class="mode">View in AR</div>
+      <a class="url" id="u-ar" target="_blank" rel="noopener"></a>
+      <button type="button" id="d-ar">Download PNG</button>
     </div>
   </div>
 
-  <section class="sheet" id="sheet" hidden>
-    <h2>Printed card</h2>
-    <p>Print this page at 100% and the card below comes out exactly 3 inches square, which the card mode relies on for real-size scale. Keep it flat and well lit. If you print it at another size, add <code>&amp;card=102</code> (the width in mm) to the card link.</p>
-    <div class="card-print">
-      <img src="target.png" alt="Tracking card" class="target">
-      <div class="card-codes" id="card-codes"></div>
-    </div>
-  </section>
-
-  <button type="button" class="print" id="print" hidden>Print codes and card</button>
+  <button type="button" class="print" id="print" hidden>Print</button>
 </main>
 
 <script>
@@ -130,38 +95,19 @@
     $('print').hidden = !show;
     if (!show) return;
 
-    for (const mode of ['free', 'fixed', 'card']) {
-      const params = new URLSearchParams({ model });
-      if (mode === 'card') params.set('mode', 'card'); else params.set('scale', mode);
-      if (title) params.set('title', title);
-      const url = base + '?' + params.toString();
-      const box = $('qr-' + mode);
-      if (!codes[mode]) {
-        codes[mode] = new QRCode(box, { text: url, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.H });
-      } else {
-        codes[mode].clear();
-        codes[mode].makeCode(url);
-      }
-      $('h-' + mode).textContent = title || model;
-      $('u-' + mode).textContent = url;
-      $('u-' + mode).href = url;
-      $('d-' + mode).onclick = () => download(box, `${model}-${mode}.png`, title || model, mode);
-    }
-    // Small copies of all three codes for the printed card sheet.
-    $('sheet').hidden = false;
-    const cc = $('card-codes'); cc.innerHTML = '';
-    const labels = { free: 'Place in room', fixed: 'Actual size', card: 'Pin to card' };
-    for (const mode of ['free', 'fixed', 'card']) {
-      const fig = document.createElement('figure');
-      const holder = document.createElement('div');
-      new QRCode(holder, { text: $('u-' + mode).href, width: 160, height: 160, correctLevel: QRCode.CorrectLevel.H });
-      const cap = document.createElement('figcaption'); cap.textContent = `${title || model} · ${labels[mode]}`;
-      fig.append(holder, cap); cc.append(fig);
-    }
+    const params = new URLSearchParams({ model });
+    if (title) params.set('title', title);
+    const url = base + '?' + params.toString();
+    const box = $('qr-ar');
+    if (!codes.ar) codes.ar = new QRCode(box, { text: url, width: 220, height: 220, correctLevel: QRCode.CorrectLevel.H });
+    else { codes.ar.clear(); codes.ar.makeCode(url); }
+    $('h-ar').textContent = title || model;
+    $('u-ar').textContent = url; $('u-ar').href = url;
+    $('d-ar').onclick = () => download(box, `${model}-ar.png`, title || model);
   }
 
   // Compose a larger PNG with a caption under the code so printouts are self-explanatory.
-  function download(box, filename, label, mode) {
+  function download(box, filename, label) {
     const src = box.querySelector('canvas');
     if (!src) return;
     const size = 880, pad = 60, capH = 150;
@@ -176,7 +122,7 @@
     ctx.fillText(label, c.width / 2, size + pad * 2 + 40);
     ctx.font = '400 34px -apple-system, Segoe UI, Roboto, sans-serif';
     ctx.fillStyle = '#555';
-    ctx.fillText({ fixed: 'Actual size (1:1)', card: 'Pinned to printed card', free: 'Pinch to resize' }[mode], c.width / 2, size + pad * 2 + 95);
+    ctx.fillText('Scan to view in AR', c.width / 2, size + pad * 2 + 95);
     const a = document.createElement('a');
     a.href = c.toDataURL('image/png'); a.download = filename; a.click();
   }
