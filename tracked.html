@@ -49,9 +49,6 @@
   mindar-image="imageTargetSrc: targets.mind; autoStart: true; uiLoading: no; uiScanning: no; uiError: no; filterMinCF: 0.0001; filterBeta: 0.01;"
   color-management="legacy" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false"
   renderer="colorManagement: true; physicallyCorrectLights: true; antialias: true;">
-  <a-assets timeout="60000">
-    <a-asset-item id="model" src=""></a-asset-item>
-  </a-assets>
   <a-camera position="0 0 0" look-controls="enabled: false" wasd-controls="enabled: false"></a-camera>
   <a-entity light="type: ambient; intensity: 1.2"></a-entity>
   <a-entity light="type: directional; intensity: 1.4" position="1 2 2"></a-entity>
@@ -59,7 +56,7 @@
   <a-entity id="target" mindar-image-target="targetIndex: 0">
     <!-- rotation 90° about X stands the model up out of the card (glTF is Y-up; the card plane is XY with Z toward the viewer). -->
     <a-entity id="rig" rotation="90 0 0">
-      <a-gltf-model id="gltf" src="#model"></a-gltf-model>
+      <a-entity id="gltf"></a-entity>
     </a-entity>
   </a-entity>
 </a-scene>
@@ -96,12 +93,17 @@
   } else {
     document.getElementById('name').textContent = title;
     document.title = title + ' on card';
-    document.getElementById('model').setAttribute('src', name === 'astronaut' ? 'https://modelviewer.dev/shared-assets/models/Astronaut.glb' : `models/${name}.glb`);
+    const modelUrl = name === 'astronaut' ? 'https://modelviewer.dev/shared-assets/models/Astronaut.glb' : `models/${name}.glb`;
 
     const status = document.getElementById('status');
     const rig = document.getElementById('rig');
     const gltf = document.getElementById('gltf');
     const ratioEl = document.getElementById('ratio');
+    status.textContent = 'Loading model…';
+    // Attach the model once the scene exists, so the component is guaranteed to see the URL.
+    const scene = document.getElementById('scene');
+    const attach = () => gltf.setAttribute('gltf-model', modelUrl);
+    if (scene.hasLoaded) attach(); else scene.addEventListener('loaded', attach, { once: true });
 
     // In MindAR the card is 1 unit wide, so 1:1 means (1 / cardWidth) scene units per metre.
     const oneToOne = 1 / cardWidth;
@@ -119,7 +121,18 @@
 
     gltf.addEventListener('model-loaded', () => {
       const obj = gltf.object3D;
-      const box = new THREE.Box3().setFromObject(obj);
+      // Measure in the model's own space, not world space: the card's camera-relative transform
+      // (huge numbers in tracker units) and the rig rotation must not leak into the centring offset.
+      obj.updateMatrixWorld(true);
+      const toLocal = new THREE.Matrix4().copy(obj.matrixWorld).invert();
+      const box = new THREE.Box3();
+      obj.traverse((m) => {
+        if (m.isMesh && m.geometry) {
+          if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+          box.union(m.geometry.boundingBox.clone().applyMatrix4(m.matrixWorld).applyMatrix4(toLocal));
+        }
+      });
+      if (box.isEmpty()) { status.textContent = 'Model loaded but contains no mesh geometry.'; return; }
       const size = new THREE.Vector3(); box.getSize(size);
       const centre = new THREE.Vector3(); box.getCenter(centre);
       largest = Math.max(size.x, size.y, size.z) || 1;
@@ -127,15 +140,19 @@
       obj.position.set(-centre.x, -box.min.y, -centre.z);
       // Start at real size if it fits on the card, otherwise fit it.
       if (largest * oneToOne <= 1.2) applyScale(oneToOne); else fitToCard();
-      status.textContent = 'Point the camera at the printed card';
+      const cm = (v) => (v * 100).toFixed(0);
+      status.textContent = `Model loaded (${cm(size.x)} × ${cm(size.y)} × ${cm(size.z)} cm). Point the camera at the printed card.`;
     });
-    gltf.addEventListener('model-error', () => { status.textContent = `Couldn't load models/${name}.glb`; });
+    gltf.addEventListener('model-error', (e) => { status.textContent = `Couldn't load ${modelUrl}`; console.error(e.detail); });
 
     const target = document.getElementById('target');
-    target.addEventListener('targetFound', () => { status.hidden = true; });
+    let foundTimer;
+    target.addEventListener('targetFound', () => {
+      status.hidden = false; status.textContent = 'Card found';
+      clearTimeout(foundTimer); foundTimer = setTimeout(() => { status.hidden = true; }, 1200);
+    });
     target.addEventListener('targetLost', () => { status.hidden = false; status.textContent = 'Card lost. Point the camera at it again.'; });
 
-    const scene = document.getElementById('scene');
     scene.addEventListener('arError', () => {
       document.body.innerHTML = `<div class="error"><h1>Camera not available</h1><p>Open this link in Safari (iPhone) or Chrome (Android), not inside another app, and allow camera access.</p><a href="${back.href}">Back</a></div>`;
     });
