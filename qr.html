@@ -43,7 +43,7 @@
   .sheet { display: grid; gap: 12px; }
   .sheet h2 { margin: 0; font-size: 18px; font-weight: 600; }
   .card-print { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: grid; gap: 12px; justify-items: start; }
-  .target { width: 150mm; max-width: 100%; height: auto; display: block; }
+  .target { width: 2in; height: 2in; display: block; image-rendering: crisp-edges; }
   .card-codes { display: flex; gap: 10mm; flex-wrap: wrap; }
   .card-codes figure { margin: 0; display: grid; justify-items: center; gap: 2mm; font-size: 10pt; color: #111; }
   .card-codes canvas, .card-codes img { width: 28mm !important; height: 28mm !important; }
@@ -103,7 +103,7 @@
 
   <section class="sheet" id="sheet" hidden>
     <h2>Printed card</h2>
-    <p>Print this page and the card below comes out exactly 150 mm wide, which the card mode relies on for real-size scale. Keep it flat and well lit. If you print it at another width, add <code>&amp;card=200</code> (the width in mm) to the card link.</p>
+    <p>Print this page at 100% and the card below comes out exactly 2 inches square, which the card mode relies on for real-size scale. Keep it flat and well lit. If you print it at another size, add <code>&amp;card=76</code> (the width in mm) to the card link.</p>
     <div class="card-print">
       <img src="target.png" alt="Tracking card" class="target">
       <div class="card-codes" id="card-codes"></div>

@@ -79,7 +79,7 @@
   const q = new URLSearchParams(location.search);
   const name = (q.get('model') || '').replace(/[^\w.-]/g, '');
   const title = q.get('title') || name.replace(/[-_]/g, ' ');
-  const cardWidth = (parseFloat(q.get('card')) || 150) / 1000;   // printed width of the card in metres; default 150 mm
+  const cardWidth = (parseFloat(q.get('card')) || 50.8) / 1000;  // printed width of the card in metres; default 2 in (50.8 mm)
 
   const back = new URL('index.html', location.href);
   if (name) back.searchParams.set('model', name);
